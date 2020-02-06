@@ -48,28 +48,6 @@ def calc_temps(start_date, end_date):
 
 
 
-
-
-
-justice_league_members = [
-    {"superhero": "Aquaman", "real_name": "Arthur Curry"},
-    {"superhero": "Batman", "real_name": "Bruce Wayne"},
-    {"superhero": "Cyborg", "real_name": "Victor Stone"},
-    {"superhero": "Flash", "real_name": "Barry Allen"},
-    {"superhero": "Green Lantern", "real_name": "Hal Jordan"},
-    {"superhero": "Superman", "real_name": "Clark Kent/Kal-El"},
-    {"superhero": "Wonder Woman", "real_name": "Princess Diana"}
-]
-
-
-
-
-
-
-
-
-
-
 #################################################
 # Flask Setup
 #################################################
@@ -94,7 +72,7 @@ def welcome():
 
 @app.route("/api/v1.0/precipitation")
 def precipitation():
-    """Return Hawaii precipitation data as json"""
+    """Return Hawaii precipitation data as json."""
     prcp_data = {}
     for date, prcp in session.query(Measurement.date, Measurement.prcp).all():
         prcp_data[date] = prcp
@@ -104,7 +82,7 @@ def precipitation():
 
 @app.route("/api/v1.0/stations")
 def stations():
-    """Return the station list as json"""
+    """Return the station list as json."""
 
     return jsonify(session.query(Station.station, Station.name, Station.latitude,\
         Station.longitude, Station.elevation).all())
@@ -113,46 +91,42 @@ def stations():
 
 @app.route("/api/v1.0/tobs")
 def tobs():
-    """Return the justice league data as json"""
+    """Requery for the dates and temperature observations from a year from the last data point.
+    Return a JSON list of Temperature Observations (tobs) for the previous year."""
 
-    return jsonify(justice_league_members)
+    max_date = session.query(func.max(Measurement.date)).all()[0][0]
+    start_date = str(int(max_date[:4])-1) + max_date[4:] # Pull the year, decrement it, and reubild the date
+    tobs_data = session.query(Measurement.date, Measurement.station, Measurement.tobs).filter(Measurement.date>=start_date).order_by(Measurement.date).all()
+    return jsonify(tobs_data)
 
 
-@app.route("/api/v1.0/<start>")
+@app.route("/api/v1.0/<start_date>")
 def daily_start(start_date):
-    """Fetch the Justice League character whose real_name matches
-       the path variable supplied by the user, or a 404 if not."""
+    """Return a JSON list of the minimum temperature, the average temperature, and the
+    max temperature for a given start or start-end range. When given the start only,
+    calculate TMIN, TAVG, and TMAX for all dates greater than and equal to the start date."""
 
-    canonicalized = real_name.replace(" ", "").lower()
-    for character in justice_league_members:
-        search_term = character["real_name"].replace(" ", "").lower()
+    results = session.query(Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
+        group_by(Measurement.date).filter(Measurement.date >= start_date).all()
 
-        if search_term == canonicalized:
-            return jsonify(character)
-
-    return jsonify({"error": f"Character with real_name {real_name} not found."}), 404
+    return jsonify(results)
 
 
 
-@app.route("/api/v1.0/<start>/<end>")
+@app.route("/api/v1.0/<start_date>/<end_date>")
 def daily_start_end(start_date, end_date):
-    """Fetch the Justice League character whose real_name matches
-       the path variable supplied by the user, or a 404 if not."""
+    """Return a JSON list of the minimum temperature, the average temperature, and the
+    max temperature for a given start or start-end range. When given the start and the end date, calculate the TMIN,
+    TAVG, and TMAX for dates between the start and end date inclusive."""
 
-    canonicalized = real_name.replace(" ", "").lower()
-    for character in justice_league_members:
-        search_term = character["real_name"].replace(" ", "").lower()
+    results = session.query(Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
+        group_by(Measurement.date).filter(Measurement.date >= start_date).\
+            filter(Measurement.date <= end_date).all()
 
-        if search_term == canonicalized:
-            return jsonify(character)
-
-    return jsonify({"error": f"Character with real_name {real_name} not found."}), 404
+    return jsonify(results)
 
 
 if __name__ == "__main__":
-    print('Before app.run')
-
-
-
+    print('Before app.run()')
     app.run(debug=True)
-    print('Hi')
+    print('Bye!')
